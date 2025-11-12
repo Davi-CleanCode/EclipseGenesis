@@ -1,0 +1,18 @@
+
+Prefabs placeholders - instruções
+-------------------------------
+Player.prefab:
+ - SpriteRenderer with your player sprite
+ - Rigidbody2D (Dynamic), CapsuleCollider2D
+ - PlayerController.cs attached
+ - Tag: Player
+
+Eclipta.prefab:
+ - SpriteRenderer with eclipta sprite
+ - Rigidbody2D (Kinematic or Dynamic)
+ - Collider2D
+ - Eclipta.cs attached
+
+Predar.prefab:
+ - Large boss object, multiple child hitboxes
+ - PredarBoss.cs attached

@@ -1,0 +1,9 @@
+
+Main.unity - Instruções de montagem rápida (placeholder)
+-------------------------------------------------------
+1. Abra a cena vazia no Unity.
+2. Adicione GameManager (GameObject vazio) e anexe GameManager.cs.
+3. Adicione UIManager e NarrativeManager com seus scripts.
+4. Crie Player (Sprite) com Rigidbody2D, Collider2D e PlayerController.cs.
+5. Crie Enemy prefab com EnemyAI.cs, Rigidbody2D e Collider2D.
+6. Salve a cena como 'Main.unity' dentro de Assets/Scenes.
