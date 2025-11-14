@@ -1,48 +1,56 @@
-
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    public static GameManager Instance { get; private set; }
+    public static GameManager Instance;
 
     public bool IsPaused { get; private set; }
-    public int CurrentLevel = 1;
+    public bool IsGameOver { get; private set; }
 
-    void Awake()
+    private void Awake()
     {
-        if (Instance == null) Instance = this;
-        else Destroy(gameObject);
+        if (Instance != null && Instance != this)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        Instance = this;
         DontDestroyOnLoad(gameObject);
-    }
-
-    void Start()
-    {
-        Time.timeScale = 1f;
     }
 
     public void PauseGame()
     {
-        IsPaused = true;
         Time.timeScale = 0f;
-        UIManager.Instance.ShowPause(true);
+        IsPaused = true;
     }
 
     public void ResumeGame()
     {
-        IsPaused = false;
         Time.timeScale = 1f;
-        UIManager.Instance.ShowPause(false);
-    }
-
-    public void NextLevel()
-    {
-        CurrentLevel++;
-        Debug.Log("Carregando próxima fase...");
+        IsPaused = false;
     }
 
     public void GameOver()
     {
-        Debug.Log("Fim da partida. O jogador caiu diante da escuridão.");
-        UIManager.Instance.ShowGameOver();
+        IsGameOver = true;
+        Time.timeScale = 0f;
+        Debug.Log("GAME OVER");
+    }
+
+    public void RestartScene()
+    {
+        Time.timeScale = 1f;
+        IsGameOver = false;
+
+        Scene current = SceneManager.GetActiveScene();
+        SceneManager.LoadScene(current.buildIndex);
+    }
+
+    public void LoadScene(int sceneIndex)
+    {
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(sceneIndex);
     }
 }

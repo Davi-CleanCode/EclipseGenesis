@@ -1,33 +1,28 @@
-
 using UnityEngine;
-using System.Collections.Generic;
 
 public class NarrativeManager : MonoBehaviour
 {
-    public static NarrativeManager Instance { get; private set; }
+    public static NarrativeManager Instance;
 
-    Dictionary<string, System.Action> events = new Dictionary<string, System.Action>();
-
-    void Awake()
+    private void Awake()
     {
-        if (Instance == null) Instance = this; else Destroy(gameObject);
-        DontDestroyOnLoad(gameObject);
+        Instance = this;
     }
 
-    void Start()
-    {
-        events["PredarDefeated"] = OnPredarDefeated;
-    }
+    public delegate void OnDialogueEnd();
+    public OnDialogueEnd onDialogueEndCallback;
 
-    public void TriggerEvent(string key)
+    public void StartDialogue(string[] linhas)
     {
-        if (events.ContainsKey(key)) events[key]?.Invoke();
-        else Debug.LogWarning("Evento não encontrado: " + key);
-    }
+        // Aqui você pode integrar com UI futuramente
+        Debug.Log("INICIANDO DIÁLOGO:");
 
-    void OnPredarDefeated()
-    {
-        Debug.Log("O Predar foi derrotado. O destino de Kael'Thar e da Terra está em suas mãos.");
-        UIManager.Instance.ShowFinalChoices();
+        foreach (string linha in linhas)
+        {
+            Debug.Log(linha);
+        }
+
+        onDialogueEndCallback?.Invoke();
     }
 }
+

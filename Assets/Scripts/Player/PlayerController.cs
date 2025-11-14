@@ -1,60 +1,73 @@
-
 using UnityEngine;
 
-[RequireComponent(typeof(Rigidbody2D))]
 public class PlayerController : MonoBehaviour
 {
-    public float moveSpeed = 5f;
-    public float jumpForce = 7f;
+    [Header("Movimentação")]
+    public float moveSpeed = 7f;
+    public float jumpForce = 12f;
+
+    [Header("Checagem de chão")]
+    public Transform groundCheck;
+    public float groundCheckRadius = 0.15f;
+    public LayerMask groundLayer;
+
+    [Header("Status")]
     public int maxHealth = 100;
+    public int currentHealth;
 
-    int currentHealth;
-    Rigidbody2D rb;
-    Vector2 input;
-    bool facingRight = true;
+    private Rigidbody2D rb;
+    private bool isGrounded;
 
-    void Start()
+    private void Start()
     {
         rb = GetComponent<Rigidbody2D>();
         currentHealth = maxHealth;
     }
 
-    void Update()
+    private void Update()
     {
-        input.x = Input.GetAxisRaw("Horizontal"); 
-        if (Input.GetButtonDown("Jump")) TryJump();
+        Movimento();
+        Pulo();
+        ChecarQueda();
     }
 
-    void FixedUpdate()
+    void Movimento()
     {
-        rb.velocity = new Vector2(input.x * moveSpeed, rb.velocity.y);
-        FlipSprite();
+        float move = Input.GetAxisRaw("Horizontal");
+        rb.velocity = new Vector2(move * moveSpeed, rb.velocity.y);
+
+        // Flip visual do personagem
+        if (move != 0)
+            transform.localScale = new Vector3(move, 1, 1);
     }
 
-    void FlipSprite()
+    void Pulo()
     {
-        if (input.x > 0 && !facingRight || input.x < 0 && facingRight)
+        isGrounded = Physics2D.OverlapCircle(groundCheck.position, groundCheckRadius, groundLayer);
+
+        if (Input.GetButtonDown("Jump") && isGrounded)
         {
-            facingRight = !facingRight;
-            transform.localScale = new Vector3(-transform.localScale.x, transform.localScale.y, transform.localScale.z);
+            rb.velocity = new Vector2(rb.velocity.x, jumpForce);
         }
     }
 
-    void TryJump()
+    void ChecarQueda()
     {
-        rb.AddForce(Vector2.up * jumpForce, ForceMode2D.Impulse);
+        if (transform.position.y < -12f)
+        {
+            GameManager.Instance.RestartLevel();
+        }
     }
 
-    public void TakeDamage(int amount)
+    public void TomarDano(int dano)
     {
-        currentHealth -= amount;
-        UIManager.Instance.UpdateHealth(currentHealth, maxHealth);
-        if (currentHealth <= 0) Die();
-    }
+        currentHealth -= dano;
 
-    void Die()
-    {
-        Debug.Log("O herói cibernético caiu. A Terra permanece em risco.");
-        GameManager.Instance.GameOver();
+        UIManager.Instance.AtualizarVida(currentHealth, maxHealth);
+
+        if (currentHealth <= 0)
+        {
+            GameManager.Instance.RestartLevel();
+        }
     }
 }
