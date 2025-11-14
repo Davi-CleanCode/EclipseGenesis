@@ -1,54 +1,53 @@
 using UnityEngine;
-using System.Collections.Generic;
 
-[RequireComponent(typeof(Collider2D))]
-public class EnemyAttackHitbox : MonoBehaviour
+namespace EclipseGenesis.Enemies
 {
-    [Header("Damage Settings")]
-    public int damage = 15;
-    public float knockbackForce = 8f;
-
-    [Header("Hitbox Options")]
-    public bool destroyAfterHit = false;
-    public bool oneHitPerAttack = true;
-
-    private HashSet<GameObject> objectsHit = new HashSet<GameObject>();
-
-    private void Awake()
+    public class EnemyAttackHitbox : MonoBehaviour
     {
-        // Garante que o collider seja usado como trigger
-        Collider2D col = GetComponent<Collider2D>();
-        col.isTrigger = true;
-    }
+        [Header("Damage Settings")]
+        public int damageAmount = 10;
 
-    private void OnEnable()
-    {
-        // Sempre limpa ao reativar
-        objectsHit.Clear();
-    }
+        [Header("Optional Knockback")]
+        public bool applyKnockback = false;
+        public float knockbackForce = 5f;
 
-    private void OnTriggerEnter2D(Collider2D other)
-    {
-        if (!other.CompareTag("Player")) return;
-
-        GameObject obj = other.gameObject;
-
-        // Se hit único por ataque estiver ativado
-        if (oneHitPerAttack && objectsHit.Contains(obj))
-            return;
-
-        objectsHit.Add(obj);
-
-        // Aplica dano
-        PlayerStats player = obj.GetComponent<PlayerStats>();
-        if (player != null)
+        private void OnTriggerEnter2D(Collider2D collision)
         {
-            Vector2 direction = (obj.transform.position - transform.position).normalized;
-            player.TakeDamage(damage, direction, knockbackForce);
+            // Só atinge o jogador
+            if (collision.CompareTag("Player"))
+            {
+                PlayerStats playerStats = collision.GetComponent<PlayerStats>();
+                if (playerStats != null)
+                {
+                    playerStats.TakeDamage(damageAmount);
+
+                    if (applyKnockback)
+                    {
+                        ApplyKnockback(collision.transform);
+                    }
+                }
+            }
         }
 
-        // Destruir hitbox depois do hit (útil para ataques rápidos)
-        if (destroyAfterHit)
-            gameObject.SetActive(false);
+        private void ApplyKnockback(Transform player)
+        {
+            Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
+            if (rb == null) return;
+
+            Vector2 direction = (player.position - transform.position).normalized;
+            rb.AddForce(direction * knockbackForce, ForceMode2D.Impulse);
+        }
+
+        // Chamado via evento de animação (Animation Event)
+        public void ActivateHitbox()
+        {
+            GetComponent<Collider2D>().enabled = true;
+        }
+
+        // Chamado via evento de animação
+        public void DeactivateHitbox()
+        {
+            GetComponent<Collider2D>().enabled = false;
+        }
     }
 }

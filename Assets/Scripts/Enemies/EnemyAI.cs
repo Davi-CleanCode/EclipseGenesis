@@ -1,228 +1,122 @@
 using UnityEngine;
-using System.Collections;
 
-[RequireComponent(typeof(Rigidbody2D))]
-[RequireComponent(typeof(EnemyStats))]
-public class EnemyAI : MonoBehaviour
+namespace EclipseGenesis.Enemies
 {
-    private enum EnemyState
+    public class EnemyAI : MonoBehaviour
     {
-        Idle,
-        Patrol,
-        Chase,
-        Attack,
-        Stunned
-    }
+        [Header("References")]
+        public Transform leftLimit;
+        public Transform rightLimit;
+        private Transform player;
+        private Animator animator;
 
-    [Header("Movement")]
-    public float moveSpeed = 2f;
-    public float chaseSpeed = 3f;
-    public float patrolRange = 3f;
-    public float groundCheckDistance = 1f;
+        [Header("Movement Settings")]
+        public float moveSpeed = 2f;
+        public float chaseSpeed = 3f;
+        public float stopDistance = 1.3f;
+        public float detectionRange = 6f;
+        public float returnSpeed = 2f;
 
-    [Header("Combat")]
-    public float attackRange = 1.2f;
-    public int damage = 15;
-    public float attackCooldown = 1f;
+        private Vector3 initialPosition;
+        private Vector3 patrolTarget;
+        private EnemyState currentState = EnemyState.Patrol;
 
-    [Header("Detection")]
-    public float detectionRange = 5f;
-    public LayerMask playerLayer;
+        public bool canMove = true;
 
-    private EnemyState currentState;
-    private Rigidbody2D rb;
-    private EnemyStats stats;
-    private Transform player;
-    private Vector2 startPosition;
-    private float patrolDirection = 1;
-    private bool canAttack = true;
-    private bool isFacingRight = true;
-
-    private void Awake()
-    {
-        rb = GetComponent<Rigidbody2D>();
-        stats = GetComponent<EnemyStats>();
-    }
-
-    private void Start()
-    {
-        currentState = EnemyState.Patrol;
-        startPosition = transform.position;
-
-        GameObject p = GameObject.FindGameObjectWithTag("Player");
-        if (p != null)
-            player = p.transform;
-    }
-
-    private void Update()
-    {
-        if (stats.IsDead) return;
-
-        switch (currentState)
+        private void Start()
         {
-            case EnemyState.Idle: HandleIdle(); break;
-            case EnemyState.Patrol: HandlePatrol(); break;
-            case EnemyState.Chase: HandleChase(); break;
-            case EnemyState.Attack: HandleAttack(); break;
-            case EnemyState.Stunned:
-                // nada aqui — stun é controlado pela coroutine
-                break;
+            player = GameObject.FindGameObjectWithTag("Player")?.transform;
+            animator = GetComponent<Animator>();
+
+            initialPosition = transform.position;
+            patrolTarget = leftLimit.position;
         }
 
-        DetectPlayer();
-    }
-
-    // ---------------------------------------------------------------------- //
-    //  ESTADOS
-    // ---------------------------------------------------------------------- //
-
-    private void HandleIdle()
-    {
-        rb.velocity = Vector2.zero;
-    }
-
-    private void HandlePatrol()
-    {
-        rb.velocity = new Vector2(moveSpeed * patrolDirection, rb.velocity.y);
-
-        // Inverte caso chegue no limite da patrulha
-        if (Vector2.Distance(transform.position, startPosition) >= patrolRange)
+        private void Update()
         {
-            Flip();
-            patrolDirection *= -1;
-        }
-    }
+            if (!canMove) return;
+            if (player == null) return;
 
-    private void HandleChase()
-    {
-        if (player == null) return;
+            float distanceToPlayer = Vector2.Distance(transform.position, player.position);
 
-        float direction = Mathf.Sign(player.position.x - transform.position.x);
-        rb.velocity = new Vector2(direction * chaseSpeed, rb.velocity.y);
-
-        // vira pro player
-        if ((direction > 0 && !isFacingRight) || (direction < 0 && isFacingRight))
-            Flip();
-
-        // Se estiver perto o suficiente -> atacar
-        if (Vector2.Distance(transform.position, player.position) <= attackRange)
-        {
-            ChangeState(EnemyState.Attack);
-        }
-    }
-
-    private void HandleAttack()
-    {
-        rb.velocity = Vector2.zero;
-
-        if (player == null) return;
-        if (!canAttack) return;
-
-        StartCoroutine(AttackCoroutine());
-    }
-
-    // ---------------------------------------------------------------------- //
-    //  DETECÇÃO
-    // ---------------------------------------------------------------------- //
-
-    private void DetectPlayer()
-    {
-        if (player == null) return;
-
-        float distance = Vector2.Distance(transform.position, player.position);
-
-        if (currentState != EnemyState.Stunned)
-        {
-            if (distance <= attackRange)
-                ChangeState(EnemyState.Attack);
-
-            else if (distance <= detectionRange)
-                ChangeState(EnemyState.Chase);
-
-            else
-                ChangeState(EnemyState.Patrol);
-        }
-    }
-
-    // ---------------------------------------------------------------------- //
-    //  ATAQUE
-    // ---------------------------------------------------------------------- //
-
-    private IEnumerator AttackCoroutine()
-    {
-        canAttack = false;
-
-        // *** Aqui você pode chamar animação ***
-        // animação de ataque → evento chama DealDamage()
-
-        yield return new WaitForSeconds(0.1f);
-
-        DealDamage();
-
-        yield return new WaitForSeconds(attackCooldown);
-        canAttack = true;
-
-        ChangeState(EnemyState.Chase);
-    }
-
-    private void DealDamage()
-    {
-        if (player == null) return;
-
-        float distance = Vector2.Distance(transform.position, player.position);
-        if (distance <= attackRange)
-        {
-            PlayerStats pStats = player.GetComponent<PlayerStats>();
-            if (pStats != null)
+            switch (currentState)
             {
-                Vector2 hitDir = (player.position - transform.position).normalized;
-                pStats.TakeDamage(damage, hitDir, 6f);
+                case EnemyState.Patrol:
+                    Patrol();
+                    if (distanceToPlayer <= detectionRange)
+                        SwitchState(EnemyState.Chase);
+                    break;
+
+                case EnemyState.Chase:
+                    ChasePlayer();
+                    if (distanceToPlayer <= stopDistance)
+                        SwitchState(EnemyState.Attack);
+                    if (distanceToPlayer > detectionRange * 1.5f)
+                        SwitchState(EnemyState.Return);
+                    break;
+
+                case EnemyState.Attack:
+                    // Movimento é bloqueado no AttackController
+                    if (distanceToPlayer > stopDistance)
+                        SwitchState(EnemyState.Chase);
+                    break;
+
+                case EnemyState.Return:
+                    ReturnToOrigin();
+                    if (Vector2.Distance(transform.position, initialPosition) < 0.2f)
+                        SwitchState(EnemyState.Patrol);
+                    break;
             }
         }
-    }
 
-    // ---------------------------------------------------------------------- //
-    //  FLIP (virar sprite)
-    // ---------------------------------------------------------------------- //
+        private void Patrol()
+        {
+            MoveTowards(patrolTarget, moveSpeed);
 
-    private void Flip()
-    {
-        isFacingRight = !isFacingRight;
-        Vector3 scale = transform.localScale;
-        scale.x *= -1;
-        transform.localScale = scale;
-    }
+            // Troca direção ao chegar no limite
+            if (Vector2.Distance(transform.position, patrolTarget) < 0.2f)
+            {
+                patrolTarget = patrolTarget == leftLimit.position ?
+                               rightLimit.position : leftLimit.position;
+            }
+        }
 
-    // ---------------------------------------------------------------------- //
-    //  TRANSIÇÃO DE ESTADOS
-    // ---------------------------------------------------------------------- //
+        private void ChasePlayer()
+        {
+            MoveTowards(player.position, chaseSpeed);
+        }
 
-    private void ChangeState(EnemyState newState)
-    {
-        if (currentState == newState) return;
+        private void ReturnToOrigin()
+        {
+            MoveTowards(initialPosition, returnSpeed);
+        }
 
-        currentState = newState;
-    }
+        private void MoveTowards(Vector3 target, float speed)
+        {
+            Vector3 direction = (target - transform.position).normalized;
+            transform.position += direction * speed * Time.deltaTime;
 
-    // ---------------------------------------------------------------------- //
-    //  STUN (usado pelo EnemyStats)
-    // ---------------------------------------------------------------------- //
+            // vira o inimigo
+            if (direction.x != 0)
+                transform.localScale = new Vector3(Mathf.Sign(direction.x), 1, 1);
 
-    public void Stun(float duration)
-    {
-        StopAllCoroutines();
-        StartCoroutine(StunCoroutine(duration));
-    }
+            animator.SetFloat("Speed", Mathf.Abs(direction.x));
+        }
 
-    private IEnumerator StunCoroutine(float duration)
-    {
-        ChangeState(EnemyState.Stunned);
-        rb.velocity = Vector2.zero;
+        public void StopMovement()
+        {
+            animator.SetFloat("Speed", 0);
+            canMove = false;
+        }
 
-        // Aqui pode tocar uma animação de hit / flash vermelho
+        public void ResumeMovement()
+        {
+            canMove = true;
+        }
 
-        yield return new WaitForSeconds(duration);
-
-        ChangeState(EnemyState.Patrol);
+        private void SwitchState(EnemyState newState)
+        {
+            currentState = newState;
+        }
     }
 }
